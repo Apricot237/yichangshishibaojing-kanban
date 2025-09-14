@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>山东中烟生产制造智能管理平台 · 设备告警态势感知</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background-color: #0F172A;
+            color: #FFFFFF;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* 主容器 */
+        .dashboard-container {
+            display: grid;
+            grid-template-areas: 
+                "header header header header"
+                "left middle middle right";
+            grid-template-columns: 300px 1fr 1fr 300px;
+            grid-template-rows: auto 1fr;
+            gap: 20px;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        /* 顶部区域 */
+        .header-section {
+            grid-area: header;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid;
+            border-image: linear-gradient(to right, #2563EB, #60A5FA) 1;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #3B82F6, #60A5FA);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .main-title {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(to right, #3B82F6, #60A5FA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .time-section {
+            text-align: right;
+        }
+
+        .current-time {
+            font-size: 18px;
+            font-weight: 600;
+            color: #3B82F6;
+        }
+
+        .current-date {
+            font-size: 14px;
+            color: #94A3B8;
+            margin-top: 5px;
+        }
+
+        /* 左侧区域 */
+        .left-section {
+            grid-area: left;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 中部区域 */
+        .middle-section {
+            grid-area: middle;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 右侧区域 */
+        .right-section {
+            grid-area: right;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* 通用卡片样式 - 优化精致 */
+        .card {
+            background: linear-gradient(135deg, rgba(30, 58, 138, 0.3), rgba(15, 23, 42, 0.5));
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                        0 0 0 1px rgba(59, 130, 246, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(59, 130, 246, 0.5), transparent);
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                        0 0 0 1px rgba(59, 130, 246, 0.2);
+        }
+
+        .card-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #FFFFFF;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+            position: relative;
+            padding-left: 12px;
+        }
+
+        .card-title::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 4px;
+            height: 16px;
+            background: linear-gradient(to bottom, #3B82F6, #60A5FA);
+            border-radius: 2px;
+        }
+
+        /* 图表容器 */
+        .chart-container {
+            position: relative;
+            width: 100%;
+            height: 200px;
+            margin: 0 auto;
+        }
+
+        /* 筛选条件 */
+        .filter-section {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+
+        .filter-item {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .filter-label {
+            font-size: 12px;
+            color: #94A3B8;
+        }
+
+        .filter-select {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            color: #FFFFFF;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .filter-select:hover {
+            border-color: #3B82F6;
+            background: rgba(15, 23, 42, 0.9);
+        }
+
+        .filter-select:focus {
+            outline: none;
+            border-color: #60A5FA;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
+
+        /* 告警表格 */
+        .alarm-table-container {
+            height: 400px;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .alarm-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .alarm-table th {
+            background-color: #1E3A8A;
+            color: #FFFFFF;
+            font-size: 12px;
+            padding: 12px;
+            text-align: left;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .alarm-table td {
+            font-size: 13px;
+            color: #94A3B8;
+            padding: 12px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .alarm-table tr {
+            transition: background-color 0.3s ease;
+        }
+
+        .alarm-table tr:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+
+        /* 告警级别 */
+        .alarm-level {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+        }
+
+        .level-icon {
+            font-size: 16px;
+        }
+
+        .level-emergency {
+            color: #DC2626;
+        }
+
+        .level-warning {
+            color: #F59E0B;
+        }
+
+        .level-info {
+            color: #3B82F6;
+        }
+
+        /* 超时未处理闪烁效果 */
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .timeout-warning {
+            animation: blink 1s infinite;
+            color: #DC2626 !important;
+        }
+
+        /* 操作按钮 */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .btn-detail {
+            background: rgba(59, 130, 246, 0.2);
+            color: #3B82F6;
+            border: 1px solid #3B82F6;
+        }
+
+        .btn-detail:hover {
+            background: #3B82F6;
+            color: #FFFFFF;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-handle {
+            background: rgba(16, 185, 129, 0.2);
+            color: #10B981;
+            border: 1px solid #10B981;
+        }
+
+        .btn-handle:hover {
+            background: #10B981;
+            color: #FFFFFF;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+
+        /* 条形图容器 */
+        .bar-chart-container {
+            height: 250px;
+            position: relative;
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #3B82F6;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #2563EB;
+        }
+
+        /* 实时滚动提示 */
+        .scroll-indicator {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: linear-gradient(135deg, #DC2626, #EF4444);
+            color: #FFFFFF;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            animation: pulse 2s infinite;
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+
+        /* 核心指标区 - 独立卡片样式 */
+        .metrics-section {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #1E3A8A, #0F2347);
+            border: 1px solid #3B82F6;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                        0 0 0 1px rgba(59, 130, 246, 0.2);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 25px 15px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(59, 130, 246, 0.8), transparent);
+        }
+
+        .metric-card::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(59, 130, 246, 0.3), transparent);
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                        0 0 0 1px rgba(59, 130, 246, 0.3);
+        }
+
+        .metric-name {
+            font-size: 16px;
+            color: #FFFFFF;
+            font-weight: 500;
+            margin-bottom: 15px;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .metric-value {
+            font-size: 36px;
+            color: #7DD3FC;
+            font-weight: 700;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .metric-value::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #7DD3FC, transparent);
+        }
+
+        /* 趋势图表区 */
+        .trend-section {
+            background: linear-gradient(135deg, rgba(15, 35, 71, 0.8), rgba(15, 23, 42, 0.6));
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 12px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                        0 0 0 1px rgba(59, 130, 246, 0.1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .trend-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(59, 130, 246, 0.5), transparent);
+        }
+
+        .trend-title {
+            font-size: 20px;
+            color: #FFFFFF;
+            text-align: center;
+            margin-bottom: 20px;
+            position: relative;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .trend-title::after {
+            content: '';
+            position: absolute;
+            bottom: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 120px;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #3B82F6, transparent);
+        }
+
+        #trendChart {
+            width: 100%;
+            height: 230px;
+        }
+
+        /* 红色渐变卡片特殊样式 */
+        .card-red-gradient {
+            background: linear-gradient(135deg, rgba(0, 21, 138, 0.3), rgba(29, 68, 127, 0.5));
+            border: 1px solid rgba(0, 15, 219, 0.3);
+            box-shadow: 0 8px 32px rgba(8, 31, 238, 0.2), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                        0 0 0 1px rgba(239, 68, 68, 0.1);
+        }
+
+        .card-red-gradient::before {
+            background: linear-gradient(to right, transparent, rgba(0, 21, 138, 0.3), transparent);
+        }
+
+        .card-red-gradient:hover {
+            box-shadow: 0 12px 40px rgba(220, 38, 38, 0.3), 
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                        0 0 0 1px rgba(239, 68, 68, 0.2);
+        }
+
+        .card-red-gradient .card-title::before {
+            background: linear-gradient(to bottom, #DC2626, #EF4444);
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- 顶部区域 -->
+        <div class="header-section">
+            <div class="logo-section">
+                <div class="logo">SD</div>
+                <h1 class="main-title">山东中烟生产制造智能管理平台 · 设备告警态势统计</h1>
+            </div>
+            <div class="time-section">
+                <div class="current-time" id="currentTime">00:00:00</div>
+                <div class="current-date" id="currentDate">2024年1月15日</div>
+            </div>
+        </div>
+
+        <!-- 左侧分类统计区 -->
+        <div class="left-section">
+            <div class="card">
+                <h3 class="card-title">告警等级分布</h3>
+                <div class="chart-container">
+                    <canvas id="pieChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h3 class="card-title">告警设备排名</h3>
+                <div class="bar-chart-container">
+                    <canvas id="deviceBarChart"></canvas>
+                </div>
+            </div>
+            <div class="card">
+                <h3 class="card-title">事件类型排名</h3>
+                <div class="bar-chart-container">
+                    <canvas id="eventTypeBarChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中部区域 -->
+        <div class="middle-section">
+            <!-- 核心指标区 -->
+            <div class="metrics-section">
+                <div class="metric-card">
+                    <div class="metric-name">告警总数</div>
+                    <div class="metric-value">28567</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-name">今日告警数</div>
+                    <div class="metric-value">42</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-name">今日未读数</div>
+                    <div class="metric-value">42</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-name">今日未处理</div>
+                    <div class="metric-value">42</div>
+                </div>
+            </div>
+
+            <!-- 趋势图表区 -->
+            <div class="trend-section">
+                <h3 class="trend-title">最近一周告警趋势</h3>
+                <div id="trendChart"></div>
+            </div>
+
+            <!-- 告警清单区 -->
+            <div class="card">
+                <h3 class="card-title">最新未处理告警 · 高优先级（实时滚动）</h3>
+                
+                <!-- 筛选条件 -->
+                <div class="filter-section">
+                    <div class="filter-item">
+                        <label class="filter-label">工厂</label>
+                        <select class="filter-select" id="factoryFilter">
+                            <option value="">全部工厂</option>
+                            <option value="qingdao">青岛卷烟厂</option>
+                            <option value="jinan">济南卷烟厂</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label class="filter-label">车间</label>
+                        <select class="filter-select" id="workshopFilter">
+                            <option value="">全部车间</option>
+                            <option value="workshop1">一车间</option>
+                            <option value="workshop2">二车间</option>
+                            <option value="workshop3">三车间</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label class="filter-label">设备类型</label>
+                        <select class="filter-select" id="deviceTypeFilter">
+                            <option value="">全部类型</option>
+                            <option value="zj116">卷接机 ZJ116</option>
+                            <option value="zj119">卷接机 ZJ119</option>
+                            <option value="proteus">包装机 PROTOS</option>
+                            <option value="gdx6">包装机 GDX6</option>
+                        </select>
+                    </div>
+                    <div class="filter-item">
+                        <label class="filter-label">时间段</label>
+                        <select class="filter-select" id="timeFilter">
+                            <option value="today">今日</option>
+                            <option value="week">近7天</option>
+                            <option value="custom">自定义</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 告警表格 -->
+                <div class="alarm-table-container">
+                    <table class="alarm-table" id="alarmTable">
+                        <thead>
+                            <tr>
+                                <th>报警级别</th>
+                                <th>触发时间</th>
+                                <th>车间名称</th>
+                                <th>设备编号</th>
+                                <th>报警现象</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="alarmTableBody">
+                            <!-- 动态生成的告警数据 -->
+                        </tbody>
+                    </table>
+                    <div class="scroll-indicator">实时更新中...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧处置与风险区 -->
+        <div class="right-section">
+            <div class="card">
+                <h3 class="card-title">告警处置占比</h3>
+                <div class="chart-container">
+                    <canvas id="doughnutChart"></canvas>
+                </div>
+            </div>
+            <div class="card card-red-gradient">
+                <h3 class="card-title">严重告警类型排名</h3>
+                <div class="bar-chart-container">
+                    <canvas id="severeTypeChart"></canvas>
+                </div>
+            </div>
+            <div class="card card-red-c">
+                <h3 class="card-title">威胁事件排名</h3>
+                <div class="bar-chart-container">
+                    <canvas id="threatChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Chart.js 全局配置
+        Chart.defaults.color = '#94A3B8';
+        Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif';
+
+        // 实时时间更新
+        function updateTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
+            const dateStr = now.toLocaleDateString('zh-CN', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                weekday: 'long'
+            });
+            
+            document.getElementById('currentTime').textContent = timeStr;
+            document.getElementById('currentDate').textContent = dateStr;
+        }
+        
+        updateTime();
+        setInterval(updateTime, 1000);
+
+        // 告警数据模拟
+        const alarmData = [
+            {
+                level: 'emergency',
+                levelText: '紧急',
+                time: new Date(Date.now() - 2 * 60 * 1000),
+                workshop: '青岛卷烟厂-一车间',
+                deviceId: 'ZJ116A-03',
+                phenomenon: '胶缸温度过高',
+                timeout: false
+            },
+            {
+                level: 'warning',
+                levelText: '一般',
+                time: new Date(Date.now() - 6 * 60 * 1000),
+                workshop: '济南卷烟厂-二车间',
+                deviceId: 'PROTOS-M5',
+                phenomenon: '滤嘴堵塞',
+                timeout: true
+            },
+            {
+                level: 'info',
+                levelText: '警告',
+                time: new Date(Date.now() - 1 * 60 * 1000),
+                workshop: '青岛卷烟厂-三车间',
+                deviceId: 'GDX6-12',
+                phenomenon: '包装速度异常',
+                timeout: false
+            },
+            {
+                level: 'emergency',
+                levelText: '紧急',
+                time: new Date(Date.now() - 8 * 60 * 1000),
+                workshop: '济南卷烟厂-一车间',
+                deviceId: 'ZJ119B-07',
+                phenomenon: '烟支空头',
+                timeout: true
+            },
+            {
+                level: 'warning',
+                levelText: '一般',
+                time: new Date(Date.now() - 3 * 60 * 1000),
+                workshop: '青岛卷烟厂-二车间',
+                deviceId: 'PROTOS-M8',
+                phenomenon: '水松纸供给不足',
+                timeout: false
+            },
+            {
+                level: 'info',
+                levelText: '警告',
+                time: new Date(Date.now() - 10 * 60 * 1000),
+                workshop: '济南卷烟厂-三车间',
+                deviceId: 'GDX6-15',
+                phenomenon: '商标纸检测异常',
+                timeout: true
+            }
+        ];
+
+        // 渲染告警表格
+        function renderAlarmTable() {
+            const tbody = document.getElementById('alarmTableBody');
+            tbody.innerHTML = '';
+            
+            alarmData.forEach(alarm => {
+                const row = document.createElement('tr');
+                
+                // 检查是否超时（超过5分钟）
+                const timeDiff = (Date.now() - alarm.time.getTime()) / (1000 * 60);
+                const isTimeout = timeDiff > 5;
+                
+                row.innerHTML = `
+                    <td>
+                        <div class="alarm-level level-${alarm.level}">
+                            <span class="level-icon">${alarm.level === 'emergency' ? '🔴' : alarm.level === 'warning' ? '🟡' : '⚪'}</span>
+                            ${alarm.levelText}
+                        </div>
+                    </td>
+                    <td class="${isTimeout ? 'timeout-warning' : ''}">
+                        ${alarm.time.toLocaleTimeString('zh-CN')}
+                    </td>
+                    <td>${alarm.workshop}</td>
+                    <td>${alarm.deviceId}</td>
+                    <td>${alarm.phenomenon}</td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn btn-detail" onclick="showDetail('${alarm.deviceId}')">详情</button>
+                            <button class="btn btn-handle" onclick="handleAlarm('${alarm.deviceId}')">处理</button>
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        // 显示详情
+        function showDetail(deviceId) {
+            alert(`查看设备 ${deviceId} 的详细信息`);
+        }
+
+        // 处理告警
+        function handleAlarm(deviceId) {
+            if (confirm(`确定要处理设备 ${deviceId} 的告警吗？`)) {
+                // 移除对应的告警
+                const index = alarmData.findIndex(alarm => alarm.deviceId === deviceId);
+                if (index > -1) {
+                    alarmData.splice(index, 1);
+                    renderAlarmTable();
+                }
+            }
+        }
+
+        // 初始渲染
+        renderAlarmTable();
+
+        // 模拟新告警
+        function addNewAlarm() {
+            const levels = ['emergency', 'warning', 'info'];
+            const levelTexts = { emergency: '紧急', warning: '一般', info: '警告' };
+            const workshops = ['青岛卷烟厂-一车间', '济南卷烟厂-二车间', '青岛卷烟厂-三车间'];
+            const devices = ['ZJ116A-03', 'PROTOS-M5', 'GDX6-12', 'ZJ119B-07', 'PROTOS-M8'];
+            const phenomena = ['胶缸温度过高', '滤嘴堵塞', '包装速度异常', '烟支空头', '水松纸供给不足'];
+            
+            const randomLevel = levels[Math.floor(Math.random() * levels.length)];
+            const newAlarm = {
+                level: randomLevel,
+                levelText: levelTexts[randomLevel],
+                time: new Date(),
+                workshop: workshops[Math.floor(Math.random() * workshops.length)],
+                deviceId: devices[Math.floor(Math.random() * devices.length)],
+                phenomenon: phenomena[Math.floor(Math.random() * phenomena.length)],
+                timeout: false
+            };
+            
+            alarmData.unshift(newAlarm);
+            if (alarmData.length > 10) {
+                alarmData.pop();
+            }
+            renderAlarmTable();
+        }
+
+        // 每10秒添加一个新告警
+        setInterval(addNewAlarm, 10000);
+
+        // 筛选功能
+        document.getElementById('factoryFilter').addEventListener('change', filterAlarms);
+        document.getElementById('workshopFilter').addEventListener('change', filterAlarms);
+        document.getElementById('deviceTypeFilter').addEventListener('change', filterAlarms);
+        document.getElementById('timeFilter').addEventListener('change', filterAlarms);
+
+        function filterAlarms() {
+            // 这里实现筛选逻辑
+            console.log('筛选条件已更改');
+            // 实际应用中，这里会根据筛选条件重新获取数据
+        }
+
+        // 初始化ECharts趋势图表
+        const trendChart = echarts.init(document.getElementById('trendChart'));
+        
+        const trendOption = {
+            tooltip: {
+                trigger: 'axis',
+                axisPointer: {
+                    type: 'shadow'
+                },
+                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                borderColor: '#3B82F6',
+                borderWidth: 1,
+                textStyle: {
+                    color: '#0F172A'
+                }
+            },
+            legend: {
+                data: ['一般告警', '次要告警', '主要告警', '严重告警'],
+                top: 10,
+                right: 10,
+                textStyle: {
+                    color: '#94A3B8',
+                    fontSize: 14
+                },
+                itemWidth: 12,
+                itemHeight: 12
+            },
+            grid: {
+                left: '3%',
+                right: '4%',
+                bottom: '3%',
+                top: '60px',
+                containLabel: true
+            },
+            xAxis: {
+                type: 'category',
+                data: ['9月1日', '9月2日', '9月3日', '9月4日', '9月5日', '9月6日', '9月7日'],
+                axisLine: {
+                    lineStyle: {
+                        color: '#475569'
+                    }
+                },
+                axisLabel: {
+                    color: '#94A3B8',
+                    fontSize: 14
+                }
+            },
+            yAxis: {
+                type: 'value',
+                axisLine: {
+                    lineStyle: {
+                        color: '#475569'
+                    }
+                },
+                axisLabel: {
+                    color: '#94A3B8',
+                    fontSize: 14
+                },
+                splitLine: {
+                    lineStyle: {
+                        color: '#475569'
+                    }
+                }
+            },
+            series: [
+                {
+                    name: '一般告警',
+                    type: 'bar',
+                    data: [0, 0, 0, 0, 0, 0, 50],
+                    itemStyle: {
+                        color: '#94A3B8'
+                    },
+                    barWidth: '60%',
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(148, 163, 184, 0.5)'
+                        }
+                    }
+                },
+                {
+                    name: '次要告警',
+                    type: 'bar',
+                    data: [0, 0, 0, 0, 0, 0, 0],
+                    itemStyle: {
+                        color: '#3B82F6'
+                    },
+                    barWidth: '60%',
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(59, 130, 246, 0.5)'
+                        }
+                    }
+                },
+                {
+                    name: '主要告警',
+                    type: 'bar',
+                    data: [210, 25, 0, 0, 0, 150, 0],
+                    itemStyle: {
+                        color: '#F59E0B'
+                    },
+                    barWidth: '60%',
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(245, 158, 11, 0.5)'
+                        }
+                    }
+                },
+                {
+                    name: '严重告警',
+                    type: 'bar',
+                    data: [0, 0, 0, 0, 0, 0, 0],
+                    itemStyle: {
+                        color: '#DC2626'
+                    },
+                    barWidth: '60%',
+                    emphasis: {
+                        itemStyle: {
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(220, 38, 38, 0.5)'
+                        }
+                    }
+                },
+                {
+                    name: '趋势线',
+                    type: 'line',
+                    data: [210, 25, 0, 0, 0, 150, 50],
+                    itemStyle: {
+                        color: '#94A3B8'
+                    },
+                    lineStyle: {
+                        width: 2,
+                        color: '#94A3B8'
+                    },
+                    symbol: 'circle',
+                    symbolSize: 6,
+                    showSymbol: true
+                }
+            ]
+        };
+        
+        trendChart.setOption(trendOption);
+
+        // 响应式调整
+        window.addEventListener('resize', () => {
+            trendChart.resize();
+        });
+
+        // 告警等级分布饼图
+        const pieCtx = document.getElementById('pieChart').getContext('2d');
+        new Chart(pieCtx, {
+            type: 'pie',
+            data: {
+                labels: ['一般告警', '次要告警', '主要告警', '严重告警'],
+                datasets: [{
+                    data: [40.6, 0.0, 59.3, 0.1],
+                    backgroundColor: ['#94A3B8', '#F59E0B', '#F97316', '#DC2626'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            padding: 15,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // 告警设备排名条形图
+        const deviceBarCtx = document.getElementById('deviceBarChart').getContext('2d');
+        new Chart(deviceBarCtx, {
+            type: 'bar',
+            data: {
+                labels: ['ZJ116A-03', 'PROTOS-M5', 'GDX6-12', 'ZJ119B-07', 'PROTOS-M8'],
+                datasets: [{
+                    label: '告警数量',
+                    data: [1856, 1243, 987, 756, 632],
+                    backgroundColor: ['#F97316', '#F59E0B', '#3B82F6', '#94A3B8', '#DC2626'],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        max: 2000,
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.1)'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // 事件类型排名条形图
+        const eventTypeBarCtx = document.getElementById('eventTypeBarChart').getContext('2d');
+        new Chart(eventTypeBarCtx, {
+            type: 'bar',
+            data: {
+                labels: ['胶缸温度过高', '滤嘴堵塞', '包装速度异常', '烟支空头', '水松纸供给不足'],
+                datasets: [{
+                    label: '告警数量',
+                    data: [2156, 1897, 1432, 987, 765],
+                    backgroundColor: ['#F97316', '#F97316', '#F59E0B', '#3B82F6', '#3B82F6'],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        max: 2500,
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.1)'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // 告警处置占比环形图
+        const doughnutCtx = document.getElementById('doughnutChart').getContext('2d');
+        const doughnutChart = new Chart(doughnutCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['已处理', '未处理'],
+                datasets: [{
+                    data: [8.8, 91.2],
+                    backgroundColor: ['#94A3B8', '#3B82F6'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            },
+            plugins: [{
+                id: 'centerText',
+                beforeDraw: function(chart) {
+                    const width = chart.width;
+                    const height = chart.height;
+                    const ctx = chart.ctx;
+                    ctx.restore();
+                    const fontSize = (height / 200).toFixed(2);
+                    ctx.font = fontSize + "em sans-serif";
+                    ctx.textBaseline = "middle";
+                    ctx.fillStyle = "#FFFFFF";
+                    const text = "未处理占比 91.2%";
+                    const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                    const textY = height / 2;
+                    ctx.fillText(text, textX, textY);
+                    ctx.save();
+                }
+            }]
+        });
+
+        // 严重告警类型排名
+        const severeTypeCtx = document.getElementById('severeTypeChart').getContext('2d');
+        new Chart(severeTypeCtx, {
+            type: 'bar',
+            data: {
+                labels: ['胶缸温度过高', '烟支空头', '设备停机', '质量异常', '安全故障'],
+                datasets: [{
+                    label: '告警数量',
+                    data: [12, 8, 5, 3, 2],
+                    backgroundColor: 'rgba(220, 38, 38, 0.8)',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        max: 15,
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.1)'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // 威胁情报排名
+        const threatCtx = document.getElementById('threatChart').getContext('2d');
+        new Chart(threatCtx, {
+            type: 'bar',
+            data: {
+                labels: ['设备故障', '质量风险', '生产延误', '安全隐患', '成本超支'],
+                datasets: [{
+                    label: '威胁等级',
+                    data: [45, 38, 32, 28, 25],
+                    backgroundColor: 'rgba(220, 38, 38, 0.8)',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        max: 50,
+                        grid: {
+                            color: 'rgba(148, 163, 184, 0.1)'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+    </script>
+
+</body></html>
